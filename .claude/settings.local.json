@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\(''''dependencies'''',{}\\).keys\\(\\)\\)\\)\")",
+      "Read(//var/www/vpnstore.1stcs.gg/**)",
+      "Bash(rm /var/www/vpnstore.1stcs.gg/middleware.ts)",
+      "Read(//f//**)",
+      "Bash(find /root /home /var /srv -name middleware.ts)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

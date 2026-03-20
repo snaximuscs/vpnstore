@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+  # ─── MySQL Database ─────────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: vpn_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: vpndb
+      MYSQL_USER: vpnuser
+      MYSQL_PASSWORD: ${DB_PASSWORD:-strongpassword}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vpn_net
+
+  # ─── Next.js App ────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vpn_app
+    restart: unless-stopped
+    # Run with host network so the app can call `wg` commands on the host
+    # In production, use a privileged sidecar or SSH tunnel instead
+    network_mode: host
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: vpnuser
+      DB_PASSWORD: ${DB_PASSWORD:-strongpassword}
+      DB_NAME: vpndb
+      JWT_SECRET: ${JWT_SECRET}
+      QPAY_USERNAME: ${QPAY_USERNAME}
+      QPAY_PASSWORD: ${QPAY_PASSWORD}
+      QPAY_INVOICE_CODE: ${QPAY_INVOICE_CODE}
+      QPAY_BASE_URL: ${QPAY_BASE_URL:-https://merchant.qpay.mn/v2}
+      WG_SERVER_PUBLIC_KEY: ${WG_SERVER_PUBLIC_KEY}
+      WG_SERVER_ENDPOINT: ${WG_SERVER_ENDPOINT}
+      WG_SERVER_INTERFACE: ${WG_SERVER_INTERFACE:-wg0}
+      APP_URL: ${APP_URL:-https://vpn.1stcs.gg}
+      NEXT_PUBLIC_APP_URL: ${APP_URL:-https://vpn.1stcs.gg}
+      CRON_SECRET: ${CRON_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+    volumes:
+      # Mount /etc/wireguard so the app can run wg commands
+      - /etc/wireguard:/etc/wireguard:rw
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  vpn_net:
+    driver: bridge
